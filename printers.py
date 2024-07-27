@@ -68,7 +68,8 @@ def mprint(*strings, ending:str = '\n', indent:bool = False, file:Destination = 
 		None: This function does not return any value. It only prints the strings to the standard output.
 	"""
 
-	text = ending.join(strings) if indent else dedent(*strings)
+	strings = [str(line) for line in strings]
+	text = ending.join([str(line) for line in strings]) if indent else dedent(*strings)
 	text = text.removesuffix('\n').removeprefix('\n')
 	print(text, file=file)
 

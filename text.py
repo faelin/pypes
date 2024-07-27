@@ -201,7 +201,7 @@ class Text(PipableMixin, list[str]):
 		return Text(list(set(self)), self.end)
 
 
-	def sort(self, reverse = False, unique = True, inplace = False) -> Optional[Text]:
+	def sort(self, reverse = False, unique = True, inplace = False):
 		"""
 		Return a sorted copy of the Text object.
 
