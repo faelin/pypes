@@ -1,7 +1,7 @@
 import os
 import re
 from typing import overload
-from typing import Sequence, Callable, IO, SupportsIndex, Union, Optional, Iterator
+from typing import Sequence, MutableSequence, Callable, IO, SupportsIndex, Union, Iterator
 from types import MethodDescriptorType
 from pathlib import Path
 
@@ -23,11 +23,14 @@ class Text(PipableMixin, list[str]):
 	that could be used to modify, inspect, or search a string can be applied to a Text object.
 	"""
 
-	def __init__(self, source:Union[PathLike, Sequence[str], Iterator[str]] = None, end:str = '\n'):
+	# === INTERNAL METHODS ===
+
+	def __init__(self, source:Union[PathLike, Sequence[str], Iterator[str]] = None, end:str = '\n', flatten = True):
 		"""
 		Parameters:
 			source: Either a file-path to load as a Text object, or a list of strings to be treated as lines of text.
 			end: The default end to apply when converting the Text() object into a single contiguous string.
+			flatten: Split input lines on ``end``. Defaults to True.
 		"""
 
 		self.end = end
@@ -39,44 +42,99 @@ class Text(PipableMixin, list[str]):
 		elif is_subscripted_type(source, PathLike):  # if PathLike
 			lines = Path(source).read_text().split(end)
 		elif isinstance(source, Iterator) or is_str_list(source):
-			lines = Text._flatten([str(string).split(end) for string in source])
+			if flatten:
+				lines = self._flatten([str(string).split(end) for string in source])
+			else:
+				lines = [str(string) for string in source]
 		else:
 			raise TypeError('source must be a file-path or a list of strings')
 
 		super().__init__(lines)
 
-	def __str__(self): return self.end.join(self)
-	# def __repr__(self): return str(self)  # uncertain if we want this...
+
+	def __str__(self):
+		# join each entry with the implicit line-ending
+		return self.end.join(self)
+
+	def __list__(self):
+		# add the implicit line-ending to each entry
+		return self.suffix(self.end)[:]
 
 	def __contains__(self, key): return self.contains(key)
 
 	def __format__(self, format_spec):
-		return str(Text([line.__format__(format_spec) for line in self], end=self.end))
+		return str( self.transform(str.__format__, format_spec, suppress_errors=(TypeError,)) )
+
+	def __mod__(self, __value:Union[str,tuple[str]]):
+		return self.transform(str.__mod__, __value, suppress_errors=(TypeError,))
+
+	def __imod__(self, __value:Union[str,tuple[str]]):
+		for i,_ in enumerate(self):
+			try:
+				self[i] = self[i].__mod__(__value)
+			except TypeError:
+				pass
 
 
 	# noinspection PyUnresolvedReferences
-	def __add__(self, value):
-		""" Append value to the text. """
-		if isinstance(value, Text):
-			return super().__add__(value)
+	def __add__(self, other:Union[Sequence,str]):
+		""" Return a Text object with the contents of ``other`` appended. """
+		if isinstance(other, str):
+			return super().__add__(str(other).split(self.end))
+		if isinstance(other, type(self)):
+			return super().__add__(other)
+		if isinstance(other, Sequence):
+			return super().__add__(list(other))
 		else:
-			return super().__add__(Text(value.split(self.end) if isinstance(value, str) else value, self.end))
+			return NotImplemented
 
-	def __iadd__(self, value):
-		""" Append value to the text. """
-		if isinstance(value, Text):
-			return super().__iadd__(value)
+	def __iadd__(self, other:Union[Sequence,str]):
+		""" Append ``other`` to the text. """
+		if isinstance(other, str):
+			return super().__iadd__(str(other).split(self.end))
+		if isinstance(other, type(self)):
+			return super().__add__(other)
+		if isinstance(other, Sequence):
+			return super().__iadd__(list(other))
 		else:
-			return super().__iadd__(Text(value.split(self.end) if isinstance(value, str) else value, self.end))
+			return NotImplemented
 
-	def __lt__(self, value): raise NotImplemented
+	def __radd__(self, other):
+		""" Add self to ``other``. """
+		if hasattr(other, '__add__'):
+			return other + type(other)( list(self) )
+		else:
+			return other + str(self)
+
+	def __lt__(self, value): return NotImplemented
 
 	def __lshift__(self, path:PathLike):
 		""" Appends the contents of a file to self. """
 		if is_subscripted_type(path, PathLike):
-			return self + Text(path, self.end)
+			return self + type(self)(path, self.end)
 		else:
 			return NotImplemented
+
+	def __copy__(self):
+		return type(self)(super().copy(), end=self.end)
+
+
+	def __eq__(self, other):
+		if isinstance(other, type(self)) and hasattr(other, 'end'):
+			return super().__eq__(other) and self.end == other.end
+		else:
+			return False
+
+
+	def __ne__(self, other):
+		if isinstance(other, type(self)) and hasattr(other, 'end'):
+			return super().__ne__(other) or self.end != other.end
+		else:
+			return True
+
+
+	def __getitem__(self, __i:SupportsIndex):
+		return type(self)( super().__getitem__(__i), end=self.end )
 
 
 	# === STATIC METHODS ===
@@ -86,7 +144,7 @@ class Text(PipableMixin, list[str]):
 
 
 	@staticmethod
-	def _call_transform(__obj, callable:Callable, *args, **kwargs):
+	def _call_transform(__obj, callable:Callable, *args, suppress_errors = None, **kwargs):
 		"""
 		Internal method used to apply a transform to an object.
 
@@ -96,6 +154,8 @@ class Text(PipableMixin, list[str]):
 		Parameters:
 			__obj: Object to be transformed.
 			callable: Method or function to apply.
+			suppress_errors: Suppress errors during transform operation (returns __obj instead).
+				Defaults to False.
 			*args: Arguments to be sent to the transform.
 			**kwargs: Keyword-arguments to be sent to the transform.
 
@@ -115,21 +175,30 @@ class Text(PipableMixin, list[str]):
 				kwargs[key] = __obj
 				found = True
 
-		# if the callable is a Method, we must cast the __obj as a type that has callable.
-		if isinstance(callable, MethodDescriptorType):
+		try:
+			# attempt to cast the __obj as a type that matches callable's parent class.
 			cast = get_parent_class(callable)
 			if isinstance(cast, type) and not isinstance(__obj, cast): __obj = cast(__obj)
 			callable = __obj.__getattribute__(callable.__name__)
 
-		# if the callable is not a Method, then the args/kwargs must include a Placeholder
-		elif not found:
+		except TypeError:
+			# if we could not convert the __obj into the appropriate type,
+			#   then the args must include a placeholder
 			if args:
 				raise TypeError('args must include a Placeholder object')
 			else:
 				args = (__obj,)
 
 		# and finally, we call the callable
-		return callable(*args, **kwargs) or __obj
+		try:
+			result = callable(*args, **kwargs) or __obj
+		except Exception as ex:
+			if any( isinstance(ex, suppressed) for suppressed in suppress_errors ):
+				result = __obj
+			else:
+				raise ex
+
+		return result
 
 
 	# === FILTER METHODS ===
@@ -149,10 +218,10 @@ class Text(PipableMixin, list[str]):
 		"""
 
 		if insensitive: flags = flags | re.I
-		return Text( [line for line in self if invert ^ bool(re.search(pattern, line, flags=flags))], self.end )
+		return type(self)( [line for line in self if invert ^ bool(re.search(pattern, line, flags=flags))], self.end )
 
 
-	def lines_between(self, start:PatternLike, end:PatternLike, invert = False, flags:Union[int,RegexFlag] = 0):
+	def lines_between(self, start:PatternLike = None, end:PatternLike = None, invert = False, flags:Union[int,RegexFlag] = 0):
 		"""
 		Extracts lines between two patterns from a given file.
 		Works similarly to the sed operation 'sed -n "/$start/,/$end/p" $file'
@@ -165,8 +234,10 @@ class Text(PipableMixin, list[str]):
 		is appended to the returned lines.
 
 		Parameters:
-			start: The start pattern to search for in the text.
-			end: The end pattern to search for in the text.
+			start: Optional, the start pattern to search for in the text.
+				If omitted, all lines until the ``end`` pattern will be matched.
+			end: Optional, the end pattern to search for in the text.
+				If omitted, all lines after the ``start`` pattern will be matched.
 			invert: If True, only lines that are *not* matched are returned. Defaults to False.
 			flags: Flags to be passed to the regular-expression engine. Defaults to 0.
 
@@ -175,15 +246,16 @@ class Text(PipableMixin, list[str]):
 		"""
 
 		lines = []
-		begin = None
+		begin = None if start is not None else 0
+
 		for i, line in enumerate(self):
 			if begin is None:  # if we haven't started matching yet...
-				if re.search(start, line, flags):
+				if start is not None and re.search(start, line, flags):
 					begin = i  # begin matching...
 				elif invert:
 					# if we are in "invert" mode, append every line that is not inside of the begin-block
 					lines.append(line)
-			elif re.search(end, line, flags):
+			elif end is not None and re.search(end, line, flags):
 				if not invert:
 					# if we are NOT in "invert" mode, append lines between the 'start' and 'end' patterns (inclusive)
 					lines += self[begin:i]
@@ -193,12 +265,12 @@ class Text(PipableMixin, list[str]):
 		if begin and not invert:
 			lines += self[begin:]
 
-		return Text(lines, self.end)
+		return type(self)(lines, self.end)
 
 
 	def unique(self):
 		""" Returns a new Text object containing only the unique lines from the original Text object. Order is not guaranteed. """
-		return Text(list(set(self)), self.end)
+		return type(self)(list(set(self)), self.end)
 
 
 	def sort(self, reverse = False, unique = True, inplace = False):
@@ -220,7 +292,7 @@ class Text(PipableMixin, list[str]):
 			if unique: raise ValueError("cannot call sort() with both 'unique' and 'inplace'")
 			return super().sort(reverse=reverse)
 		else:
-			return Text(sorted(self.unique() if unique else self, reverse=reverse), self.end)
+			return type(self)(sorted(self.unique() if unique else self, reverse=reverse), self.end)
 
 
 	# === TRANSFORM METHODS ===
@@ -234,6 +306,8 @@ class Text(PipableMixin, list[str]):
 			end: LineIdentifier = None,
 			invert = False,
 			match_flags: RegexFlag = 0,
+			flatten = True,
+			suppress_errors = None,
 			**kwargs
 			):
 		"""
@@ -245,6 +319,9 @@ class Text(PipableMixin, list[str]):
 			end: The end pattern to search for in the text.
 			invert: If True, only lines that are *not* matched are returned. Defaults to False.
 			match_flags: Regex flags to use when looking for the `start` or `end` patterns.
+			flatten: Passed to the Text constructor, determines if the text should be further split.
+			suppress_errors: Passed to the transform function, suppresses exceptions during the transform.
+				See :py:meth:`Text._call_transform` for more information.
 			*args: Additional positional arguments to be passed to the specified function.
 			**kwargs: Additional keyword arguments to be passed to the specified function.
 
@@ -252,9 +329,12 @@ class Text(PipableMixin, list[str]):
 			A new Text object where all lines have been transformed according to the specified function and arguments.
 		"""
 
+		# pack transform args
+		kwargs['suppress_errors'] = suppress_errors
+
 		if not (start or end):
 			# if no `start` or `end`, process every line
-			lines = [ Text._call_transform(line, func, *args, **kwargs) for line in self ]
+			lines = [ type(self)._call_transform(line, func, *args, **kwargs) for line in self ]
 
 		else:
 			lines = []
@@ -270,7 +350,7 @@ class Text(PipableMixin, list[str]):
 					# and...
 					if not invert:
 						# transform lines that are inside of the match-block
-						line = Text._call_transform(line, func, *args, **kwargs)
+						line = type(self)._call_transform(line, func, *args, **kwargs)
 
 				# if we haven't found a match-block yet...
 				else:
@@ -280,17 +360,17 @@ class Text(PipableMixin, list[str]):
 
 						# transform the matched line if we are not inverted
 						if not invert:
-							line = Text._call_transform(line, func, *args, **kwargs)
+							line = type(self)._call_transform(line, func, *args, **kwargs)
 
 					# otherwise...
 					if invert:
 						# transform lines that are *not* inside of the match-block
-						line = Text._call_transform(line, func, *args, **kwargs)
+						line = type(self)._call_transform(line, func, *args, **kwargs)
 
 				# finally, append the current line, whether or not it was modified
 				lines.append(line)
 
-		return Text( lines, end=self.end )
+		return type(self)(lines, end=self.end, flatten=flatten)
 
 
 	def encode(self, encoding:str = "utf-8", errors:str = "strict"):
@@ -346,7 +426,10 @@ class Text(PipableMixin, list[str]):
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(lambda line : line + string, start=start, end=end)
+
+		# don't flatten the new Text if the suffix ends with the Text line-endings.
+		flatten = not string.endswith(self.end)
+		return self.transform(lambda line : line + string, start=start, end=end, flatten=flatten)
 
 	def zfill(self, width:SupportsIndex, start:LineIdentifier = None, end:LineIdentifier = None):
 		""" Left-pad each line with zeroes, to the given width.
@@ -545,7 +628,7 @@ class Text(PipableMixin, list[str]):
 			A new Text object where the specified pattern has been replaced with the replacement pattern.
 		"""
 
-		return self.transform(re.sub, pattern, replacement, Placeholder, **kwargs, start=start, end=end)
+		return self.transform(re.sub, pattern, replacement, Placeholder, **kwargs, start=start, end=end, flatten=False)
 
 
 	def tr(self, before:str, after:str, start:LineIdentifier = None, end:LineIdentifier = None):
