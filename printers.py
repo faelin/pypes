@@ -3,7 +3,7 @@ import re
 import textwrap
 from typing import IO, Any
 
-from ICPSR.utilities.typing import is_subscripted_type
+from ICPSR.utilities.typing import isinstance
 from ICPSR.utilities.typing import PathLike, Destination, OpenMode
 
 
@@ -22,7 +22,7 @@ def print(*values, file:Destination = None, mode:OpenMode = 'w', **kwargs):
 		return builtins.print(*values, **kwargs)
 	if isinstance(file, IO):
 		return builtins.print(*values, file=file, **kwargs)
-	elif is_subscripted_type(file, PathLike):
+	elif isinstance(file, PathLike):
 		with open(file, mode) as file: return builtins.print(*values, file=file, **kwargs)
 	else:
 		raise TypeError(f"invalid destination type '{file.__class__}'")

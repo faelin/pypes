@@ -1,11 +1,12 @@
 import os
 import re
+from types import FunctionType, BuiltinFunctionType, LambdaType
 from typing import overload
-from typing import Sequence, MutableSequence, Callable, IO, SupportsIndex, Union, Iterator
-from types import MethodDescriptorType
+from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
+from collections import OrderedDict
 
-from ICPSR.utilities.typing import is_str_list, is_subscripted_type, get_parent_class
+from ICPSR.utilities.typing import is_str_list, isinstance, get_parent_class
 from ICPSR.utilities.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
 from ICPSR.mixins.pipable import PipableMixin, Receiver
 from ICPSR.printers import print
@@ -39,7 +40,7 @@ class Text(PipableMixin, list[str]):
 			lines = []
 		elif isinstance(source, str) and end in source:
 			lines = source.split(end)
-		elif is_subscripted_type(source, PathLike):  # if PathLike
+		elif isinstance(source, PathLike):  # if PathLike
 			lines = Path(source).read_text().split(end)
 		elif isinstance(source, Iterator) or is_str_list(source):
 			if flatten:
@@ -51,53 +52,43 @@ class Text(PipableMixin, list[str]):
 
 		super().__init__(lines)
 
+	def __lt__(self, value): return NotImplemented
 
-	def __str__(self):
-		# join each entry with the implicit line-ending
-		return self.end.join(self)
-
-	def __list__(self):
-		# add the implicit line-ending to each entry
-		return self.suffix(self.end)[:]
+	def __str__(self): return self.end.join(self)  # join each entry with the implicit line-ending
 
 	def __contains__(self, key): return self.contains(key)
 
-	def __format__(self, format_spec):
-		return str( self.transform(str.__format__, format_spec, suppress_errors=(TypeError,)) )
+	def __copy__(self): return type(self)(super().copy(), end=self.end)
 
-	def __mod__(self, __value:Union[str,tuple[str]]):
-		return self.transform(str.__mod__, __value, suppress_errors=(TypeError,))
+	def __reversed__(self): return type(self)( super().__reversed__() )
 
-	def __imod__(self, __value:Union[str,tuple[str]]):
-		for i,_ in enumerate(self):
-			try:
-				self[i] = self[i].__mod__(__value)
-			except TypeError:
-				pass
+	def __getitem__(self, __i:SupportsIndex): return type(self)( super().__getitem__(__i), end=self.end )
 
+	def __format__(self, format_spec): return str( self.transform(str.__format__, format_spec, suppress_errors=(TypeError,), inplace=False) )
 
-	# noinspection PyUnresolvedReferences
+	def __mod__(self, __value:Union[str,tuple[str]]): return self.transform(str.__mod__, __value, suppress_errors=(TypeError,), inplace=False)
+
+	def __imod__(self, __value:Union[str,tuple[str]]): return self.transform(str.__mod__, __value, suppress_errors=(TypeError,))
+
 	def __add__(self, other:Union[Sequence,str]):
 		""" Return a Text object with the contents of ``other`` appended. """
 		if isinstance(other, str):
-			return super().__add__(str(other).split(self.end))
-		if isinstance(other, type(self)):
-			return super().__add__(other)
-		if isinstance(other, Sequence):
+			return super().__add__(other.split(self.end))
+		if isinstance(other, list):
 			return super().__add__(list(other))
 		else:
-			return NotImplemented
+			raise TypeError(f'can only concatenate Text, list, or str to text -- invalid type {other.__class__.__name__}')
+
 
 	def __iadd__(self, other:Union[Sequence,str]):
 		""" Append ``other`` to the text. """
 		if isinstance(other, str):
-			return super().__iadd__(str(other).split(self.end))
-		if isinstance(other, type(self)):
-			return super().__add__(other)
-		if isinstance(other, Sequence):
+			return super().__iadd__(other.split(self.end))
+		if isinstance(other, list):
 			return super().__iadd__(list(other))
 		else:
-			return NotImplemented
+			raise TypeError(f'can only concatenate Text, list, or str to text -- invalid type {other.__class__.__name__}')
+
 
 	def __radd__(self, other):
 		""" Add self to ``other``. """
@@ -106,17 +97,12 @@ class Text(PipableMixin, list[str]):
 		else:
 			return other + str(self)
 
-	def __lt__(self, value): return NotImplemented
-
 	def __lshift__(self, path:PathLike):
 		""" Appends the contents of a file to self. """
-		if is_subscripted_type(path, PathLike):
+		if isinstance(path, PathLike):
 			return self + type(self)(path, self.end)
 		else:
 			return NotImplemented
-
-	def __copy__(self):
-		return type(self)(super().copy(), end=self.end)
 
 
 	def __eq__(self, other):
@@ -133,10 +119,6 @@ class Text(PipableMixin, list[str]):
 			return True
 
 
-	def __getitem__(self, __i:SupportsIndex):
-		return type(self)( super().__getitem__(__i), end=self.end )
-
-
 	# === STATIC METHODS ===
 
 	@staticmethod
@@ -144,7 +126,7 @@ class Text(PipableMixin, list[str]):
 
 
 	@staticmethod
-	def _call_transform(__obj, callable:Callable, *args, suppress_errors = None, **kwargs):
+	def _call_transform(__obj, callable:Callable, *args, suppress_errors = (), **kwargs):
 		"""
 		Internal method used to apply a transform to an object.
 
@@ -165,7 +147,7 @@ class Text(PipableMixin, list[str]):
 
 		# search args/kwargs for Placeholder object and replace with __obj
 		args = list(args)
-		found = False
+		found = not args  # if args is empty, then we do not need a Placeholder.
 		for idx, arg in enumerate(args):
 			if arg is Placeholder:
 				args[idx] = __obj
@@ -175,28 +157,23 @@ class Text(PipableMixin, list[str]):
 				kwargs[key] = __obj
 				found = True
 
-		try:
+		if isinstance(callable, (FunctionType, BuiltinFunctionType, LambdaType)):
+			# if the callable is  a lambda, and args are provided, a Placeholder must be found
+			if not found:
+				raise TypeError('args must include a Placeholder object')
+			else:
+				args = (__obj,)
+		else:
 			# attempt to cast the __obj as a type that matches callable's parent class.
 			cast = get_parent_class(callable)
 			if isinstance(cast, type) and not isinstance(__obj, cast): __obj = cast(__obj)
 			callable = __obj.__getattribute__(callable.__name__)
 
-		except TypeError:
-			# if we could not convert the __obj into the appropriate type,
-			#   then the args must include a placeholder
-			if args:
-				raise TypeError('args must include a Placeholder object')
-			else:
-				args = (__obj,)
-
 		# and finally, we call the callable
 		try:
 			result = callable(*args, **kwargs) or __obj
-		except Exception as ex:
-			if any( isinstance(ex, suppressed) for suppressed in suppress_errors ):
-				result = __obj
-			else:
-				raise ex
+		except suppress_errors as ex:
+			result = __obj
 
 		return result
 
@@ -269,30 +246,10 @@ class Text(PipableMixin, list[str]):
 
 
 	def unique(self):
-		""" Returns a new Text object containing only the unique lines from the original Text object. Order is not guaranteed. """
-		return type(self)(list(set(self)), self.end)
-
-
-	def sort(self, reverse = False, unique = True, inplace = False):
+		""" Returns a new Text object containing only the unique lines from the original Text object.
+		Preserves the order of lines in the text.
 		"""
-		Return a sorted copy of the Text object.
-
-		Parameters:
-			reverse: Sort the list in descending order.
-			unique: Remove duplicate lines.
-			inplace: Sort the Text object in-place (returns the original object, now sorted).
-				Cannot be combined with the ``unique`` argument.
-
-		Returns:
-			A new Text object containing the sorted lines.
-			If the "inplace" option is used, then nothing is returned.
-		"""
-
-		if inplace:
-			if unique: raise ValueError("cannot call sort() with both 'unique' and 'inplace'")
-			return super().sort(reverse=reverse)
-		else:
-			return type(self)(sorted(self.unique() if unique else self, reverse=reverse), self.end)
+		return type(self)(OrderedDict.fromkeys(self).keys(), end=self.end)
 
 
 	# === TRANSFORM METHODS ===
@@ -307,30 +264,39 @@ class Text(PipableMixin, list[str]):
 			invert = False,
 			match_flags: RegexFlag = 0,
 			flatten = True,
-			suppress_errors = None,
+			inplace = False,
 			**kwargs
 			):
 		"""
-		Applies a transformation function to each line in the Text object.
+		Applies a transformation function to each line in the text.
 
 		Parameters:
-			func: A callable function that will be applied to each line in the Text object.
+			func: A callable function that will be applied to each line.
 			start: The start pattern to search for in the text.
 			end: The end pattern to search for in the text.
-			invert: If True, only lines that are *not* matched are returned. Defaults to False.
+			invert: If True, only lines that are *not* matched are returned. Default is False.
 			match_flags: Regex flags to use when looking for the `start` or `end` patterns.
-			flatten: Passed to the Text constructor, determines if the text should be further split.
-			suppress_errors: Passed to the transform function, suppresses exceptions during the transform.
-				See :py:meth:`Text._call_transform` for more information.
+			inplace: Transforms the object in-place. Default is False.
+			flatten: Passed to the constructor, determines if the text should be further split.
+				Only useful if ``inplace`` is False.
 			*args: Additional positional arguments to be passed to the specified function.
 			**kwargs: Additional keyword arguments to be passed to the specified function.
+				If kwargs are needed that conflict with the named parameters above,
+				they can be provided in a dictionary parameter named `kwargs` (see below).
+
+		Keyword Arguments:
+			suppress_errors: List of exceptions to ignore during the transform.
+				When an exception in the list is encountered, the current line will be left untransformed.
+				See :py:meth:`Text._call_transform` for more information.
+			kwargs: Dictionary to be passed as additional kwargs to the transform function.
+				Use this to specify kwargs that conflict with the named parameters of this function.
 
 		Returns:
 			A new Text object where all lines have been transformed according to the specified function and arguments.
 		"""
 
-		# pack transform args
-		kwargs['suppress_errors'] = suppress_errors
+		kwargs.update(kwargs)
+		kwargs.pop('kwargs', None)
 
 		if not (start or end):
 			# if no `start` or `end`, process every line
@@ -370,13 +336,17 @@ class Text(PipableMixin, list[str]):
 				# finally, append the current line, whether or not it was modified
 				lines.append(line)
 
-		return type(self)(lines, end=self.end, flatten=flatten)
+		if inplace:
+			self[:] = lines
+			return self
+		else:
+			return type(self)(lines, end=self.end, flatten=flatten)
 
 
-	def encode(self, encoding:str = "utf-8", errors:str = "strict"):
+	def encode(self, encoding:str = "utf-8", errors:str = "strict", **kwargs):
 		"""
 		Encode the Text object using the codec registered for encoding.
-		The :py:attr:`Text.end` attribute will also be encoded.
+		The :py:attr:`end` attribute will also be encoded.
 
 			encoding
 				The encoding in which to encode the lines of the Text object.
@@ -389,10 +359,10 @@ class Text(PipableMixin, list[str]):
 		"""
 
 		self.end = self.end.encode(encoding, errors)
-		return self.transform(str.encode, encoding, errors)
+		return self.transform(str.encode, encoding, errors, **kwargs)
 
 
-	def decode(self, encoding:str = "utf-8", errors:str = "strict"):
+	def decode(self, encoding:str = "utf-8", errors:str = "strict", **kwargs):
 		"""
 		Encode the Text object using the codec registered for encoding.
 		The :py:attr:`end` attribute will also be encoded.
@@ -408,19 +378,19 @@ class Text(PipableMixin, list[str]):
 		"""
 
 		if isinstance(self.end, bytes): self.end = self.end.decode(encoding, errors)
-		return self.transform(bytes.decode, encoding, errors)
+		return self.transform(bytes.decode, encoding, errors, **kwargs)
 
 	# --- add strings ---
 
-	def prefix(self, string:str, start:LineIdentifier = None, end:LineIdentifier = None):
+	def prefix(self, string:str, **kwargs):
 		""" Add a prefix to each line of the text.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(lambda line : string + line, start=start, end=end)
+		return self.transform(lambda line : string + line, **kwargs)
 
-	def suffix(self, string:str, start:LineIdentifier = None, end:LineIdentifier = None):
+	def suffix(self, string:str, **kwargs):
 		""" Add a suffix to each line of the text.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
@@ -429,122 +399,122 @@ class Text(PipableMixin, list[str]):
 
 		# don't flatten the new Text if the suffix ends with the Text line-endings.
 		flatten = not string.endswith(self.end)
-		return self.transform(lambda line : line + string, start=start, end=end, flatten=flatten)
+		return self.transform(lambda line : line + string, **kwargs, flatten=flatten)
 
-	def zfill(self, width:SupportsIndex, start:LineIdentifier = None, end:LineIdentifier = None):
+	def zfill(self, width:SupportsIndex, **kwargs):
 		""" Left-pad each line with zeroes, to the given width.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.zfill, width, start=start, end=end)
+		return self.transform(str.zfill, width, **kwargs)
 
 	# --- remove strings ---
 
-	def strip(self, chars:str = None, start:LineIdentifier = None, end:LineIdentifier = None):
+	def strip(self, chars:str = None, **kwargs):
 		""" Removes leading and trailing whitespace from each line.
 		If `chars` is given, remove any characters found in `chars` instead.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.strip, chars, start=start, end=end)
+		return self.transform(str.strip, chars, **kwargs)
 
-	def lstrip(self, chars:str = None, start:LineIdentifier = None, end:LineIdentifier = None):
+	def lstrip(self, chars:str = None, **kwargs):
 		""" Removes leading whitespace from each line.
 		If `chars` is given, remove any characters found in `chars` instead.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.lstrip, chars, start=start, end=end)
+		return self.transform(str.lstrip, chars, **kwargs)
 
-	def rstrip(self, chars:str = None, start:LineIdentifier = None, end:LineIdentifier = None):
+	def rstrip(self, chars:str = None, **kwargs):
 		""" Removes trailing whitespace from each line.
 		If `chars` is given, remove any characters found in `chars` instead.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.rstrip, chars, start=start, end=end)
+		return self.transform(str.rstrip, chars, **kwargs)
 
 	# --- change case ---
 
-	def casefold(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def casefold(self, **kwargs):
 		""" Return a version of the Text object suitable for caseless comparisons.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.casefold, start=start, end=end)
+		return self.transform(str.casefold, **kwargs)
 
-	def title(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def title(self, **kwargs):
 		""" Converts the first character of each word to upper case.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.title, start=start, end=end)
+		return self.transform(str.title, **kwargs)
 
-	def capitalize(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def capitalize(self, **kwargs):
 		""" Capitalize the first character of each line, and make all other characters lowercase.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.capitalize, start=start, end=end)
+		return self.transform(str.capitalize, **kwargs)
 
-	def upper(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def upper(self, **kwargs):
 		""" Converts each line to upper case.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.upper, start=start, end=end)
+		return self.transform(str.upper, **kwargs)
 
-	def lower(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def lower(self, **kwargs):
 		""" Converts the text into lower case.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.lower, start=start, end=end)
+		return self.transform(str.lower, **kwargs)
 
-	def swapcase(self, start:LineIdentifier = None, end:LineIdentifier = None):
+	def swapcase(self, **kwargs):
 		""" Swaps cases: lower case characters becomes upper case and vice versa.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.swapcase, start=start, end=end)
+		return self.transform(str.swapcase, **kwargs)
 
 	# --- replace characters ---
 
-	def expandtabs(self, tabsize = 8, start:LineIdentifier = None, end:LineIdentifier = None):
+	def expandtabs(self, tabsize = 8, **kwargs):
 		""" Expands each tab in the text into the number of spaces given by ``tabsize`` (default is 8).
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.expandtabs, tabsize, start=start, end=end)
+		return self.transform(str.expandtabs, tabsize, **kwargs)
 
-	def format(self, *args, start:LineIdentifier = None, end:LineIdentifier = None, **kwargs):
-		""" Formats specified values in the text.
+	def format(self, *args, **kwargs):
+		""" Formats specified values in the text. This method is especially useful for templating.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.format, *args, **kwargs, start=start, end=end)
+		return self.transform(str.format, *args, **kwargs)
 
-	def format_map(self, mapping, start:LineIdentifier = None, end:LineIdentifier = None):
+	def format_map(self, mapping, **kwargs):
 		""" Formats specified values in the text, using subsitutions from the provided mapping.
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.format_map, mapping, start=start, end=end)
+		return self.transform(str.format_map, mapping, **kwargs)
 
-	def replace(self, old, new, count = -1, limit = None, start:LineIdentifier = None, end:LineIdentifier = None):
+	def replace(self, old, new, count = -1, limit = None, **kwargs):
 		"""
 		Returns a Text object where each instance of the `old` string is replaced with the `new` string.
 
@@ -592,10 +562,10 @@ class Text(PipableMixin, list[str]):
 			else:
 				return line.replace(old, new, count)
 
-		return self.transform(replace_in_line, Placeholder, old, new, count, limit, start=start, end=end)
+		return self.transform(replace_in_line, Placeholder, old, new, count, limit, **kwargs)
 
 
-	def translate(self, table, start:LineIdentifier = None, end:LineIdentifier = None):
+	def translate(self, table, **kwargs):
 		""" Translate each line of the text, according to the translation table.
 		``table`` must be a mapping of Unicode ordinals to Unicode ordinals, strings, or None.
 		The table must implement lookup/indexing via __getitem__, for instance a dictionary or list.
@@ -605,10 +575,10 @@ class Text(PipableMixin, list[str]):
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.translate, table, start=start, end=end)
+		return self.transform(str.translate, table, **kwargs)
 
 
-	def sed(self, pattern:PatternLike, replacement:PatternLike = '', start:LineIdentifier = None, end:LineIdentifier = None, **kwargs):
+	def sed(self, pattern:PatternLike, replacement:PatternLike = '', **kwargs):
 		"""
 		Substitutes all instances of a specified pattern with a replacement pattern.
 
@@ -620,18 +590,16 @@ class Text(PipableMixin, list[str]):
 		Parameters:
 			pattern: The pattern to search for in the lines of the Text object.
 			replacement: The string to replace the matched pattern with. Defaults to an empty string.
-			start: Optional, the start point (index or pattern) to search for in the text.
-			end: Optional, the end point (index or pattern) to search for in the text.
 			**kwargs: arguments to be passed to the re.sub operation
 
 		Returns:
 			A new Text object where the specified pattern has been replaced with the replacement pattern.
 		"""
 
-		return self.transform(re.sub, pattern, replacement, Placeholder, **kwargs, start=start, end=end, flatten=False)
+		return self.transform(re.sub, pattern, replacement, Placeholder, **kwargs, flatten=False)
 
 
-	def tr(self, before:str, after:str, start:LineIdentifier = None, end:LineIdentifier = None):
+	def tr(self, before:str, after:str, **kwargs):
 		"""
 		Translate each `before` character in the object into the corresponding `after` character.
 
@@ -655,36 +623,62 @@ class Text(PipableMixin, list[str]):
 		"""
 
 		table = str.maketrans(before, after)
-		return self.transform(str.translate, table, start=start, end=end)
+		return self.transform(str.translate, table, **kwargs)
 
 	# --- justify ---
 
-	def center(self, width:int, fill:str = ' ', start:LineIdentifier = None, end:LineIdentifier = None):
+	def center(self, width:int, fill:str = ' ', **kwargs):
 		""" Returns a center-justified version of the text.
 		Padding is done using the specified fill character (default is a space).
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.center, width, fill, start=start, end=end)
+		return self.transform(str.center, width, fill, **kwargs)
 
-	def ljust(self, width:int, fill:str = ' ', start:LineIdentifier = None, end:LineIdentifier = None):
+	def ljust(self, width:int, fill:str = ' ', **kwargs):
 		""" Returns a left-justified version of the text.
 		Padding is done using the specified fill character (default is a space).
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.ljust, width, fill, start=start, end=end)
+		return self.transform(str.ljust, width, fill, **kwargs)
 
-	def rjust(self, width:int, fill:str = ' ', start:LineIdentifier = None, end:LineIdentifier = None):
+	def rjust(self, width:int, fill:str = ' ', **kwargs):
 		""" Returns a right-justified version of the string.
 		Padding is done using the specified fill character (default is a space).
 
 		If a 'start' or 'end' is provided, only the specified lines will be modified.
 		See :py:meth:`Text.transform` for more information.
 		"""
-		return self.transform(str.rjust, width, fill, start=start, end=end)
+		return self.transform(str.rjust, width, fill, **kwargs)
+
+	# --- change order ---
+
+	def sort(self, key:Callable = None, reverse = False, unique = False, inplace = True):
+		"""
+		Sort the text in ascending order in-place.
+
+		If a key function is given, apply it once to each line in the text and sort
+		according to the return values of the function.
+
+		The reverse flag can be set to sort in descending order.
+
+		Parameters:
+			key: A mapping function used to determine sort order.
+			reverse: Sort the text in descending order.
+			unique: Remove duplicate lines. Forces the method to return a new Text object.
+				Default is False.
+			inplace: If False, a new Text object containing the sorted lines is returned.
+				Default is True.
+		"""
+
+		if inplace:
+			if unique: self[:] = self.unique()
+			return super().sort(key=key, reverse=reverse)
+		else:
+			return type(self)(sorted(self.unique() if unique else self), self.end)
 
 
 	# === OUTPUT METHODS ===
@@ -992,7 +986,7 @@ def grep(pattern:PatternLike, file:PathLike = None, **kwargs) -> Union[Text, Rec
 	if file:
 		return Text(file).grep(pattern, **kwargs)
 	else:
-		return Receiver(Text.grep, pattern, **kwargs)
+		return Receiver(Text.grep, pattern, inplace=False, **kwargs)
 
 
 @overload
@@ -1025,7 +1019,7 @@ def sed(pattern:PatternLike, replacement:PatternLike = '', file:PathLike = None,
 	if file:
 		return Text(file).sed(pattern, replacement, **kwargs)
 	else:
-		return Receiver(Text.sed, pattern, replacement, **kwargs)
+		return Receiver(Text.sed, pattern, replacement, inplace=False, **kwargs)
 
 
 
@@ -1068,11 +1062,11 @@ def lines_between(start:PatternLike, end:PatternLike, file:PathLike = None, **kw
 
 def upper() -> Receiver:
 	""" Pipe Function. Convert the contents of a :py:class:`Text` object to upper-case. """
-	return Receiver(Text.upper)
+	return Receiver(Text.upper, inplace=False)
 
 def lower() -> Receiver:
 	""" Pipe Function. Convert the contents of a :py:class:`Text` object to lower-case. """
-	return Receiver(Text.lower)
+	return Receiver(Text.lower, inplace=False)
 
 def head(length:int) -> Receiver:
 	""" Pipe Function. Return the first N lines as a :py:class:`Text` object. """
@@ -1103,4 +1097,4 @@ def tr(before:str, after:str) -> Receiver:
 	See str.translate and str.maketrans (https://docs.python.org/3/library/stdtypes.html#str.maketrans)
 	for more information.
 	"""
-	return Receiver(Text.tr, before, after)
+	return Receiver(Text.tr, before, after, inplace=False)

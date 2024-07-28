@@ -4,7 +4,7 @@ import inspect
 from typing import IO, Any, Callable, Sequence, Union
 from types import BuiltinFunctionType
 
-from ICPSR.utilities.typing import get_parent_class, extend_class, is_subscripted_type
+from ICPSR.utilities.typing import get_parent_class, extend_class, isinstance
 from ICPSR.utilities.typing import PathLike, Destination
 from ICPSR.printers import print
 
@@ -59,14 +59,14 @@ class PipableMixin:
 
 	def __gt__(self, file:Destination):
 		""" Attempts to (over)write the left-hand value to the file or file-path on the right. """
-		if is_subscripted_type(file, Destination):
+		if isinstance(file, Destination):
 			return print(self, file=file, mode='w')
 		else:
 			return NotImplemented
 
 	def __rshift__(self, file:Destination):
 		""" Attempts to append the left-hand value to the file or file-path on the right. """
-		if is_subscripted_type(file, Destination):
+		if isinstance(file, Destination):
 			if isinstance(self, Receiver):
 				self.chain = Receiver(print, file=file, mode='a')
 				return None
@@ -208,7 +208,7 @@ class Receiver(PipableMixin):
 
 	def __rshift__(self, out:Destination):
 		""" Feeds the right-hand value to the '>>' (:py:meth:`__rshift__`) operator of the object on the left. """
-		if is_subscripted_type(out, Destination):
+		if isinstance(out, Destination):
 			self.chain = Receiver('__rshift__', out)
 			return self
 		else:

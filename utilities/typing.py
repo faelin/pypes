@@ -1,5 +1,6 @@
 import os
 import sys
+import builtins
 from typing import get_args, get_origin
 from typing import Literal, Union, Sequence, Mapping, Callable, IO
 import re
@@ -88,14 +89,18 @@ def is_str_list(val):
 		return all(isinstance(x, str) or hasattr(x, '__str__') for x in val)
 
 
-def is_subscripted_type(obj, typ):
-	""" Like isinstance(), but allows subscripted types. """
-	if get_origin(typ) is None:
-		return isinstance(obj, typ)
+# noinspection PyShadowingBuiltins
+def isinstance(obj, typ):
+	""" Like isinstance(), but allows subscripted types or type-tuples. """
+
+	if builtins.isinstance(typ, list) or builtins.isinstance(typ, tuple):
+		return any(builtins.isinstance(obj, _type) for _type in typ)
 	elif get_origin(typ) is Union:
-		return any(isinstance(obj, _type) for _type in get_args(typ))
+		return any(builtins.isinstance(obj, _type) for _type in get_args(typ))
+	elif get_origin(typ) is None:
+		return builtins.isinstance(obj, typ)
 	else:
-		return isinstance(obj, get_origin(typ)) and all(isinstance(arg, typ_arg) for arg, typ_arg in zip(obj, get_args(typ)))
+		return builtins.isinstance(obj, get_origin(typ)) and all(builtins.isinstance(arg, typ_arg) for arg, typ_arg in zip(obj, get_args(typ)))
 
 
 def class_path(__obj):
