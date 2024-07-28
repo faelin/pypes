@@ -6,6 +6,15 @@ from typing import Literal, Union, Sequence, Mapping, Callable, IO
 import re
 import inspect
 
+# === INTERNAL TYPES ===
+_OpenDirection = Literal['r', 'w', 'x', 'a']
+_OpenEncoding = Literal['b', 't']
+_OpenModifier = Literal['+', '']
+_open_modes = tuple(
+		[x + z for x in get_args(_OpenDirection) for z in get_args(_OpenModifier)]
+		+
+		[x + y + z for x in get_args(_OpenDirection) for y in get_args(_OpenEncoding) for z in get_args(_OpenModifier)]
+	)
 
 # === PUBLIC TYPES ===
 
@@ -27,19 +36,8 @@ StringList = Union[str, Sequence[str]]
 
 Receiver = tuple[Callable, Sequence, Mapping]
 
-
-
-_OpenDirection = Literal['r', 'w', 'x', 'a']
-_OpenEncoding = Literal['b', 't']
-_OpenModifier = Literal['+', '']
 # noinspection PyTypeHints
-OpenMode = Literal[
-					tuple(
-							[x + z for x in get_args(_OpenDirection) for z in get_args(_OpenModifier)]
-							+
-							[x + y + z for x in get_args(_OpenDirection) for y in get_args(_OpenEncoding) for z in get_args(_OpenModifier)]
-						 )
-				  ]
+OpenMode = Literal[_open_modes]
 
 class Placeholder:
 	""" Throwaway class used to mark an intended variable injection into an :py:class:`Unpack` (*args or **kwargs). """
