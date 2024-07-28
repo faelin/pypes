@@ -4,9 +4,9 @@ import inspect
 from typing import IO, Any, Callable, Sequence, Union
 from types import BuiltinFunctionType
 
-from ICPSR.utilities.typing import get_parent_class, extend_class, isinstance
-from ICPSR.utilities.typing import PathLike, Destination
-from ICPSR.printers import print
+from Pypable.utilities.typing import get_parent_class, extend_class, isinstance
+from Pypable.utilities.typing import PathLike, Destination
+from Pypable.printers import print
 
 # === HELPER FUNCTIONS ===
 
@@ -92,7 +92,7 @@ class PipableMixin:
 			The result of the right-hand callable.
 
 		Examples:
-			>>> from ICPSR.utilities.text import cat, grep, sed
+			>>> from Pypable.utilities.text import cat, grep, sed
 			>>> cat('example.txt') | grep('some text') | sed('_', '.')
 		"""
 

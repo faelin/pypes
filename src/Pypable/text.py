@@ -6,10 +6,10 @@ from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from ICPSR.utilities.typing import is_str_list, isinstance, get_parent_class
-from ICPSR.utilities.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
-from ICPSR.mixins.pipable import PipableMixin, Receiver
-from ICPSR.printers import print
+from Pypable.utilities.typing import is_str_list, isinstance, get_parent_class
+from Pypable.utilities.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
+from Pypable.mixins.pipable import PipableMixin, Receiver
+from Pypable.printers import print
 
 
 class Text(PipableMixin, list[str]):
