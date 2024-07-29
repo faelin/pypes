@@ -681,6 +681,26 @@ class Text(PipableMixin, list[str]):
 			return type(self)(sorted(self.unique() if unique else self), self.end)
 
 
+	def reverse(self, inplace = True):
+		"""
+		Sort the text in ascending order in-place.
+
+		If a key function is given, apply it once to each line in the text and sort
+		according to the return values of the function.
+
+		The reverse flag can be set to sort in descending order.
+
+		Parameters:
+			inplace: If False, a new Text object containing the sorted lines is returned.
+				Default is True.
+		"""
+
+		if inplace:
+			return super().reverse()
+		else:
+			return reversed(self)
+
+
 	# === OUTPUT METHODS ===
 	# methods for sending the content of the Text object.
 
