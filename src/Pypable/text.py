@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 from Pypable.typing import is_str_list, isinstance, get_parent_class
 from Pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
-from Pypable.mixins.pipable import PipableMixin, Receiver
+from Pypable.mixins import PipableMixin, Receiver
 from Pypable.printers import print
 
 
@@ -60,7 +60,7 @@ class Text(PipableMixin, list[str]):
 
 	def __copy__(self): return type(self)(super().copy(), end=self.end)
 
-	def __reversed__(self): return type(self)( super().__reversed__() )
+	def __reversed__(self): return type(self)( list(super().__reversed__()) )
 
 	def __getitem__(self, __i:SupportsIndex): return type(self)( super().__getitem__(__i), end=self.end )
 
@@ -762,23 +762,30 @@ class Text(PipableMixin, list[str]):
 		Returns:
 			(index, position): Tuple containing the index of the matching line,
 				and the position of the match within that line.
+				Returns None if no match is found.
 
 		Raises:
 			TypeError: If neither a substring nor a pattern is provided as an argument.
 		"""
 
+		if not (pattern or substring): raise TypeError("count() requires a pattern or substring argument")
+
 		if last:
-			enumerator = reversed(list(enumerate(self[start:end])))
+			lines = reversed(self)
 			finder = 'rfind'
 		else:
-			enumerator = enumerate(self[start:end])
+			lines = self
 			finder = 'find'
 
-		for idx,line in enumerator:
-			if pattern and (match := re.search(pattern, line)): return idx,match.start()
-			elif substring and (pos := getattr(line, finder)(substring)) > -1: return idx,pos
-		else:
-			raise TypeError("count() requires a pattern or substring argument")
+		found = None
+		for idx,line in enumerate(lines):
+			if pattern:
+				match = re.search(pattern, line)
+				if match: found = match.start()
+			elif substring:
+				found = getattr(line, finder)(substring)
+
+			if found and found != -1: return idx,found
 
 
 	def rfind(self, substring:str = None, start:SupportsIndex = None, end:SupportsIndex = None) -> tuple[int,int]:

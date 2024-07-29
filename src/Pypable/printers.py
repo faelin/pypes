@@ -144,7 +144,8 @@ def dedent(*strings:str, ending:str = '\n'):
 	"""
 
 	text = ending.join(strings)
-	if match := re.search('^([ \t]+)\Z', text, flags = re.MULTILINE):  # obtain the horizontal whitespace indent of the final line
+	match = re.search('^([ \t]+)\Z', text, flags = re.MULTILINE)
+	if match:  # obtain the horizontal whitespace indent of the final line
 		indent = match.group()
 		return re.sub(f'^{indent}', '', text, flags = re.MULTILINE)  # strip {indent} from the beginning of each line
 	else:
