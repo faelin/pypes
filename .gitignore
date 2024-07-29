@@ -1,0 +1,9 @@
+
+
+# quick-add
+.DS_Store
+.DS_store
+__pycache__
+**/__pycache__/**
+.idea/*
+*/__pycache__/*
