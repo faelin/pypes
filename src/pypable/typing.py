@@ -4,7 +4,7 @@ import sys
 import inspect
 import builtins
 from typing import get_args, get_origin
-from typing import Literal, Union, Sequence, Mapping, Callable, IO
+from typing import Literal, Union, Sequence, Dict, Tuple, Callable, IO, Any
 
 # === INTERNAL TYPES ===
 _OpenDirection = Literal['r', 'w', 'x', 'a']
@@ -34,7 +34,7 @@ YesNo = Literal['y','n', True, False]
 
 StringList = Sequence[str]
 
-Receiver = tuple[Callable, Sequence, Mapping]
+ReceiverLike = Tuple[Callable, Tuple[Any, ...], Dict[str, Any]]
 
 # noinspection PyTypeHints
 OpenMode = Literal[_open_modes]
@@ -48,16 +48,22 @@ class Placeholder:
 
 def get_parent_class(__obj):
 	""" Return the parent class of an object or function. """
-	if hasattr(__obj, '__module__') and __obj.__module__ is not None:
-		module = sys.modules[__obj.__module__]
-		class_name = __obj.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0]
-		return getattr(module, class_name)
+
+	if isinstance(__obj, type):
+		return __obj
+	elif hasattr(__obj, '__module__'):
+		if hasattr(__obj, '__class__') and hasattr(__obj.__class__, '__module__') and __obj.__class__.__module__ == __obj.__module__:
+			return __obj.__class__
+		elif __obj.__module__ not in (None, '__main__', 'builtins'):
+			module = sys.modules[__obj.__module__]
+			class_name = __obj.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0]
+			return getattr(module, class_name)
 	elif hasattr(__obj, '__qualname__') and __obj.__qualname__ is not None:
 		module = sys.modules['builtins']
 		class_name = __obj.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0]
 		return getattr(module, class_name)
 	else:
-		return __obj.__class__
+		return type(__obj)
 
 
 def extend_class(cls:Union[type,str], *mixins:type, attrs:dict = None) -> type:
@@ -77,7 +83,7 @@ def extend_class(cls:Union[type,str], *mixins:type, attrs:dict = None) -> type:
 
 	if isinstance(cls, str): cls = classes_in_frame[cls]
 
-	if issubclass(cls, mixins): return cls  # return if already extended
+	if mixins and issubclass(cls, mixins): return cls  # return if already extended
 
 	# generate a name for the new class, to avoid collisions
 	mixin_names = [ mixin.__name__.title() for mixin in mixins ]

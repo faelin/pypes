@@ -6,13 +6,13 @@ from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from Pypable.typing import isinstance, get_parent_class
-from Pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
-from Pypable.mixins import PipableMixin, Receiver
-from Pypable.printers import print
+from pypable.typing import isinstance, get_parent_class
+from pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
+from pypable.mixins import Pipable, Receiver
+from pypable.printers import print
 
 
-class Text(PipableMixin, list[str]):
+class Text(Pipable, list[str]):
 	"""
 	A Text object is a thinly-wrapped list of strings.
 
