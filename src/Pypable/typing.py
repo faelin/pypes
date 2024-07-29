@@ -32,7 +32,7 @@ RegexFlag = Union[int, re.RegexFlag]
 
 YesNo = Literal['y','n', True, False]
 
-StringList = Union[str, Sequence[str]]
+StringList = Sequence[str]
 
 Receiver = tuple[Callable, Sequence, Mapping]
 
@@ -77,14 +77,7 @@ def extend_class(cls:type, *mixins:type, **attrs) -> type:
 		# otherwise we create the extended class, then attempt to instantiate it with cls
 		extended_class = type(extension_name, (*mixins, cls), attrs)
 		return extended_class
-
-
-def is_str_list(val):
-	""" Determines whether all objects in the list are strings """
-	if val is str:
-		return False
 	else:
-		return all(isinstance(x, str) or hasattr(x, '__str__') for x in val)
 
 
 # noinspection PyShadowingBuiltins

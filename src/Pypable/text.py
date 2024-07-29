@@ -6,7 +6,7 @@ from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from Pypable.typing import is_str_list, isinstance, get_parent_class
+from Pypable.typing import isinstance, get_parent_class
 from Pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
 from Pypable.mixins import PipableMixin, Receiver
 from Pypable.printers import print
@@ -26,7 +26,7 @@ class Text(PipableMixin, list[str]):
 
 	# === INTERNAL METHODS ===
 
-	def __init__(self, source:Union[PathLike, Sequence[str], Iterator[str]] = None, end:str = '\n', flatten = True):
+	def __init__(self, source:Union[PathLike, StringList, Iterator[str]] = None, end:str = '\n', flatten = True):
 		"""
 		Parameters:
 			source: Either a file-path to load as a Text object, or a list of strings to be treated as lines of text.
@@ -42,7 +42,7 @@ class Text(PipableMixin, list[str]):
 			lines = source.split(end)
 		elif isinstance(source, PathLike):  # if PathLike
 			lines = Path(source).read_text().split(end)
-		elif isinstance(source, Iterator) or is_str_list(source):
+		elif isinstance(source, StringList) or isinstance(source, Iterator):
 			if flatten:
 				lines = self._flatten([str(string).split(end) for string in source])
 			else:
