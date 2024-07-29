@@ -6,8 +6,8 @@ from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from Pypable.utilities.typing import is_str_list, isinstance, get_parent_class
-from Pypable.utilities.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
+from Pypable.typing import is_str_list, isinstance, get_parent_class
+from Pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
 from Pypable.mixins.pipable import PipableMixin, Receiver
 from Pypable.printers import print
 

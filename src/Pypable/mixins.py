@@ -4,8 +4,8 @@ import inspect
 from typing import IO, Any, Callable, Sequence, Union
 from types import BuiltinFunctionType
 
-from Pypable.utilities.typing import get_parent_class, extend_class, isinstance
-from Pypable.utilities.typing import PathLike, Destination
+from Pypable.typing import get_parent_class, extend_class, isinstance
+from Pypable.typing import PathLike, Destination
 from Pypable.printers import print
 
 # === HELPER FUNCTIONS ===
@@ -92,7 +92,7 @@ class PipableMixin:
 			The result of the right-hand callable.
 
 		Examples:
-			>>> from Pypable.utilities.text import cat, grep, sed
+			>>> from Pypable.text import cat, grep, sed
 			>>> cat('example.txt') | grep('some text') | sed('_', '.')
 		"""
 
@@ -162,7 +162,7 @@ class PipableMixin:
 			# if right-hand is a defined function, try calling it with self and args
 			result = __callable(self, *args, **kwargs)
 			pipable_obj = extend_class(result.__class__, Receiver)
-			result = pipable_obj(resut)
+			result = pipable_obj(result)
 
 		elif isinstance(__callable, type):
 			# if right-hand is a class, attempt to extend it using the PipableMixin mixin
