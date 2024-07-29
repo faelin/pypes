@@ -30,7 +30,7 @@ class UnpipableError(PipeError):
 			__obj: Optional, the unpipable object that caused the exception.
 			*args: additional information for the exception
 		"""
-		out = ()
+
 		message = "cannot pipe object of type '{}'"
 		if __obj == '':
 			out = args

@@ -1,10 +1,10 @@
+import re
 import os
 import sys
+import inspect
 import builtins
 from typing import get_args, get_origin
 from typing import Literal, Union, Sequence, Mapping, Callable, IO
-import re
-import inspect
 
 # === INTERNAL TYPES ===
 _OpenDirection = Literal['r', 'w', 'x', 'a']
