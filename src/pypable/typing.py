@@ -39,14 +39,10 @@ ReceiverLike = Tuple[Callable, Tuple[Any, ...], Dict[str, Any]]
 # noinspection PyTypeHints
 OpenMode = Literal[_open_modes]
 
-class Placeholder:
-	""" Throwaway class used to mark an intended variable injection into an :py:class:`Unpack` (*args or **kwargs). """
-	pass
-
 
 # === TYPING HELPERS ===
 
-def get_parent_class(__obj):
+def get_parent_class(__obj:object):
 	""" Return the parent class of an object or function. """
 
 	if isinstance(__obj, type):
@@ -66,14 +62,14 @@ def get_parent_class(__obj):
 		return type(__obj)
 
 
-def extend_class(cls:Union[type,str], *mixins:type, attrs:dict = None) -> type:
+def extend_class(cls:Union[type,str], *mixins:type, **attrs) -> type:
 	""" Dynamically extend a class with the specified mixins and attributes.
 
 	Parameters:
 		cls: The class to extend.
 		*mixins: Additional base-classes to include in the new class.
 			The `cls` class is appended to this list when generating the new subclass.
-		attrs: Additional attribute and method definitions for the class.
+		**attrs: Additional attribute and method definitions for the class.
 			See the `Python docs <https://docs.python.org/3.9/library/functions.html#type>`_
 			for more information on the :py:class:`type` function.
 	"""
@@ -95,25 +91,28 @@ def extend_class(cls:Union[type,str], *mixins:type, attrs:dict = None) -> type:
 		return classes_in_frame[extension_name]
 	else:
 		# otherwise we create the new subclass and return it
-		extended_class = type(extension_name, (*mixins, cls), attrs or {})
+		extended_class = type(extension_name, (cls, *mixins), attrs)
 		return extended_class
 
 
-def wrap_object(__obj, *mixins:type, **attrs):
+def wrap_object(__obj, *mixins:type, invert_priority = False, **attrs):
 	""" Cast the object such that it includes the specified mixins.
 
 	Parameters:
 		__obj: The object to wrap.
-		*mixins: Additional base-classes to include in the new class.
-			The `cls` class is appended to this list when generating the new subclass.
-		attrs: Additional attribute and method definitions for the class.
+		*mixins: The additional base-classes to include in the new class.
+			The class of `__obj` will become the primary base of the new subclass.
+		invert_priority: Place the base-class of `__obj` at the end of the inheritance list.
+			This will cause the `mixins` to have priority in the class.
+			Default is False.
+		**attrs: Additional attribute and method definitions for the class.
 			See the `Python docs <https://docs.python.org/3.9/library/functions.html#type>`_
 			for more information on the :py:class:`type` function.
 	"""
 
 	cls = get_parent_class(__obj)
-	return extend_class(cls, *mixins, **attrs)(__obj)
-
+	types = (*mixins, cls) if invert_priority else (cls, *mixins)
+	return extend_class(*types, **attrs)(__obj)
 
 
 # noinspection PyShadowingBuiltins

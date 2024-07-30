@@ -1,14 +1,13 @@
 import os
 import re
-from types import FunctionType, BuiltinFunctionType, LambdaType
 from typing import overload
 from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from pypable.typing import isinstance, get_parent_class
-from pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, Placeholder, LineIdentifier, RegexFlag
-from pypable.mixins import Pipable, Receiver
+from pypable.typing import isinstance
+from pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, LineIdentifier, RegexFlag
+from pypable.mixins import Pipable, Receiver, Placeholder
 from pypable.printers import print
 
 
@@ -124,9 +123,8 @@ class Text(Pipable, list[str]):
 	@staticmethod
 	def _flatten(xss): return [x for xs in xss for x in xs]
 
-
 	@staticmethod
-	def _call_transform(__obj, callable:Callable, *args, suppress_errors = (), **kwargs):
+	def _call_transform(__callable: Callable, __obj, *args, suppress_errors = (), **kwargs):
 		"""
 		Internal method used to apply a transform to an object.
 
@@ -134,8 +132,8 @@ class Text(Pipable, list[str]):
 		If args are included, then either the args or kwargs must include a :py:class:`Placeholder` type
 
 		Parameters:
+			__callable: Method or function to apply.
 			__obj: Object to be transformed.
-			callable: Method or function to apply.
 			suppress_errors: Suppress errors during transform operation (returns __obj instead).
 				Defaults to False.
 			*args: Arguments to be sent to the transform.
@@ -145,37 +143,13 @@ class Text(Pipable, list[str]):
 			The result of the transform, or the value of ``__obj`` if the transform returned `None`.
 		"""
 
-		# search args/kwargs for Placeholder object and replace with __obj
-		args = list(args)
-		found = not args  # if args is empty, then we do not need a Placeholder.
-		for idx, arg in enumerate(args):
-			if arg is Placeholder:
-				args[idx] = __obj
-				found = True
-		for key in kwargs:
-			if kwargs[key] is Placeholder:
-				kwargs[key] = __obj
-				found = True
-
-		if isinstance(callable, (FunctionType, BuiltinFunctionType, LambdaType)):
-			# if the callable is  a lambda, and args are provided, a Placeholder must be found
-			if not found:
-				raise TypeError('args must include a Placeholder object')
-			else:
-				args = (__obj,)
-		else:
-			# attempt to cast the __obj as a type that matches callable's parent class.
-			cast = get_parent_class(callable)
-			if isinstance(cast, type) and not isinstance(__obj, cast): __obj = cast(__obj)
-			callable = __obj.__getattribute__(callable.__name__)
-
-		# and finally, we call the callable
 		try:
-			result = callable(*args, **kwargs) or __obj
+			# noinspection PyUnresolvedReferences
+			result = __class__._call_upon(__callable, __obj, *args, **kwargs)
 		except suppress_errors as ex:
-			result = __obj
+			result = None
 
-		return result
+		return result or __obj
 
 
 	# === FILTER METHODS ===
@@ -300,7 +274,7 @@ class Text(Pipable, list[str]):
 
 		if not (start or end):
 			# if no `start` or `end`, process every line
-			lines = [ type(self)._call_transform(line, func, *args, **kwargs) for line in self ]
+			lines = [type(self)._call_transform(func, line, *args, **kwargs) for line in self]
 
 		else:
 			lines = []
@@ -316,7 +290,7 @@ class Text(Pipable, list[str]):
 					# and...
 					if not invert:
 						# transform lines that are inside of the match-block
-						line = type(self)._call_transform(line, func, *args, **kwargs)
+						line = type(self)._call_transform(func, line, *args, **kwargs)
 
 				# if we haven't found a match-block yet...
 				else:
@@ -326,12 +300,12 @@ class Text(Pipable, list[str]):
 
 						# transform the matched line if we are not inverted
 						if not invert:
-							line = type(self)._call_transform(line, func, *args, **kwargs)
+							line = type(self)._call_transform(func, line, *args, **kwargs)
 
 					# otherwise...
 					if invert:
 						# transform lines that are *not* inside of the match-block
-						line = type(self)._call_transform(line, func, *args, **kwargs)
+						line = type(self)._call_transform(func, line, *args, **kwargs)
 
 				# finally, append the current line, whether or not it was modified
 				lines.append(line)
