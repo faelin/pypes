@@ -1,33 +1,33 @@
-# Pypable: A Toolset for Piping Values and Text Processing
+# pypes: A Toolset for Piping Values and Text Processing
 
 ## Introduction
 
-Pypable is a Python package designed to simplify the process of piping values between functions and provide optional shell-like text-processing tools. 
+pypes is a Python package designed to simplify the process of piping values between functions and provide optional shell-like text-processing tools. 
 
 The `PipableMixin` class provides features to make any class pipable, in the style of traditional shells such as Bourne and Zsh.
 
 The package's second most important feature is the `Receiver`, which allows you to easily chain functions and pass values between them.
 
-Additionally, the `Pypable.text` module offers utilities for shell-like text processing and manipulation.
+Additionally, the `pypes.text` module offers utilities for shell-like text processing and manipulation.
 
 ## Installation
 
-To install Pypable, use pip:
+To install pypes, use pip:
 
 ```bash
-pip install pypable
+pip install pypes
 ```
 
 ## Usage
 
 ### PipableMixin
 
-The `PipableMixin` is the most important tool in Pypable. It allows add pipe-based chaining to all methods of the inheriting class.
+The `PipableMixin` is the most important tool in pypes. It allows add pipe-based chaining to all methods of the inheriting class.
 Here's an example of how to use it:
 
 ```python
-from pypable.mixins import Pipable
-from pypable.typing import wrap_object
+from pypes.mixins import Pipable
+from pypes.typing import wrap_object
 
 def double(value):
     return value * 2
@@ -44,7 +44,7 @@ The `Receiver` class is used to create a "receiving" function call. By placing a
 Here's an example of how to use it:
 
 ```python
-from pypable.mixins import Receiver
+from pypes.mixins import Receiver
 
 # Create a "receiver-function" by returning a Receiver with the desired operation
 def raise_power(value, power):
@@ -59,7 +59,7 @@ result = 5 | Receiver(raise_power, 2)
 Alternatively, a Receiver can be assigned to a variable, and that variable used as the target of a pipe:
 
 ```python
-from pypable.mixins import Receiver
+from pypes.mixins import Receiver
 
 def add(value, other):
     return value + other
@@ -74,10 +74,10 @@ result = 5 | add_three
 
 ### Text Module
 
-The `Pypable.text` module provides utility functions for text processing and manipulation.
+The `pypes.text` module provides utility functions for text processing and manipulation.
 
 ```python
-from pypable.text import cat, grep, sed
+from pypes.text import cat, grep, sed
 
 jabberwocky = cat('jabberwocky.txt')
 # “Beware the Jabberwock, my son!
@@ -96,11 +96,11 @@ result = jabberwocky | grep('beware') | sed(',?\s', '_') > 'beware.txt'
 
 ### Printer Utilities
 
-The `Pypable.printers` module provides some simple methods for printing and decorating multi-line strings.
+The `pypes.printers` module provides some simple methods for printing and decorating multi-line strings.
 Here's an example of how to use it:
 
 ```python
-from pypable.printers import mprint
+from pypes.printers import mprint
 
 result = mprint("""
     This is a
@@ -114,16 +114,16 @@ result = mprint("""
 
 In this example, we also show that the mprint has a unique style of dedenting that uses the whitespace of the final line (`    """`) as a guide for how much whitespace to remove. If the final line does not consist solely of horizontal whitespace, then the `textwrap.dedent()` function is used instead.
 
-### Pypable Typing
+### pypes Typing
 
-Finally, the `Pypable.typing` module provides a few additional tools that may be useful outside of piping context.
+Finally, the `pypes.typing` module provides a few additional tools that may be useful outside of piping context.
 
 Some of the available functions include:
 
 - `isinstance(obj, types)`: A replacement for the built-in _isinstance_, this function accepts subscripted types and type-tuples.
 - `get_parent_class(obj)`: Returns the class that an instance belongs to. This works even on builtins and nested classes. This is especially useful for determining the parent class of a method, where the `__class__` attribute would typically return a `method_descriptor` type.
 - `wrap_object(obj, *mixins, attrs)`: Dynamically cast an object as a subclass that includes the `mixins`.
-- `class_path(obj)`: Get the fully qualified name of the class that `__obj` belongs to, e.g. `class_path(Text())` returns `"Pypable.text.Text"`.
+- `class_path(obj)`: Get the fully qualified name of the class that `__obj` belongs to, e.g. `class_path(Text())` returns `"pypes.text.Text"`.
 
 
 Here's an example of how to use these functions:
@@ -134,4 +134,4 @@ Here's an example of how to use these functions:
 
 ## License
 
-Pypable is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
+pypes is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.

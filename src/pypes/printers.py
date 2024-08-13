@@ -3,8 +3,8 @@ import re
 import textwrap
 from typing import IO, Any
 
-from pypable.typing import isinstance
-from pypable.typing import PathLike, Destination, OpenMode
+from pypes.typing import isinstance
+from pypes.typing import PathLike, Destination, OpenMode
 
 
 # noinspection PyShadowingBuiltins

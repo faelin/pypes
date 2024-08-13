@@ -5,10 +5,10 @@ from typing import Sequence, Callable, IO, SupportsIndex, Union, Iterator
 from pathlib import Path
 from collections import OrderedDict
 
-from pypable.typing import isinstance
-from pypable.typing import PathLike, Destination, PatternLike, StringList, OpenMode, LineIdentifier, RegexFlag
-from pypable.mixins import Pipable, Receiver, Placeholder
-from pypable.printers import print
+from pypes.typing import isinstance
+from pypes.typing import PathLike, Destination, PatternLike, StringList, OpenMode, LineIdentifier, RegexFlag
+from pypes.mixins import Pipable, Receiver, Placeholder
+from pypes.printers import print
 
 
 class Text(Pipable, list[str]):

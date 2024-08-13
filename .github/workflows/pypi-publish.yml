@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/Pypable
+      url: https://pypi.org/p/pypes
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/Pypable
+      url: https://pypi.org/p/pypes
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 

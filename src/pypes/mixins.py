@@ -6,9 +6,9 @@ import inspect
 from typing import Any, Callable, Sequence, Union
 from types import BuiltinFunctionType, FunctionType, LambdaType, MethodDescriptorType
 
-from pypable.typing import get_parent_class, extend_class, wrap_object, isinstance
-from pypable.typing import PathLike, Destination, ReceiverLike
-from pypable.printers import print
+from pypes.typing import get_parent_class, extend_class, wrap_object, isinstance
+from pypes.typing import PathLike, Destination, ReceiverLike
+from pypes.printers import print
 
 # === HELPER FUNCTIONS ===
 
@@ -186,7 +186,7 @@ class Pipable:
 			The result of the right-hand callable.
 
 		Examples:
-			>>> from pypable.text import cat, grep, sed
+			>>> from pypes.text import cat, grep, sed
 			>>> cat('example.txt') | grep('some text') | sed('_', '.')
 		"""
 
@@ -308,7 +308,7 @@ class Receiver(Pipable):
 			The result of the right-hand callable.
 
 		Examples:
-			>>> from pypable.text import cat, grep, sed
+			>>> from pypes.text import cat, grep, sed
 			>>> cat('example.txt') | grep('some text') | sed('_', '.')
 		"""
 

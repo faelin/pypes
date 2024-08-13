@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "Pypable"
+name = "pypes"
 version = "0.2.0"
 authors = [
   { name="Faelin", email="faelin.codes@gmail.com" },
@@ -18,5 +18,5 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/faelin/Pypable"
-Issues = "https://github.com/faelin/Pypable/issues"
+Homepage = "https://github.com/faelin/pypes"
+Issues = "https://github.com/faelin/pypes/issues"
