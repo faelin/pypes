@@ -1,4 +1,4 @@
-name: Verify ready for release
+name: Prep for PR
 
 on:
   pull_request:
