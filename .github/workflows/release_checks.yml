@@ -1,0 +1,55 @@
+name: Verify ready for release
+
+on:
+  pull_request:
+    branches: [ "release" ]
+
+    
+permissions:
+  contents: read
+
+  
+jobs:
+  version-bumped:
+    name: Version must be bumped when creating a release PR
+    runs-on: ubuntu-20.04  
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Required due to the way Git works, without it this action won't be able to find any or the correct tags
+      - name: 'Get Previous tag'
+        id: previous-tag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        
+      - name: Determine intended version
+        id: computed-tag
+        run: |
+          set -e
+          TAG=$(cat pyproject.toml \
+            | grep --extended-regexp "^version =" \
+            | grep --extended-regexp --only-matching "[0-9]+\.[0-9]+.[0-9]+[-\.\+a-zA-Z0-9]*" \
+            | head --lines=1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Version bumped
+        uses: jackbilestech/semver-compare@1.0.4
+        with:
+          head: ${{ steps.computed-tag.outputs.tag }}
+          base: ${{ steps.previous-tag.outputs.tag }}
+          operator: '>'
+
+  changelog-updated:
+    name: Check for updated changelog
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
+      - name: Verify changed files
+        uses: tj-actions/verify-changed-files@v20
+        with:
+          files: |
+             CHANGELOG.md
+          

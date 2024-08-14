@@ -5,9 +5,12 @@ name: 'Test Package'
 
 on:
   push:
-    branches: [ '*' ]
-  pull_request:
-    branches: [ "main", "dev" ]
+    branches:
+      - '**'
+      - '!release'
+    paths:
+      - src/**
+      - tests/**
 
 jobs:
   build:

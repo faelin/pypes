@@ -1,4 +1,4 @@
-# pypes: A Toolset for Piping Values and Text Processing
+# A toolset to enable unix-style value piping (now with text processing!)
 
 ## Introduction
 
