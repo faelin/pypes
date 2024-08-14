@@ -8,8 +8,16 @@ on:
     branches:
       - '**'
       - '!release'
+    paths:
+      - src/**
+      - tests/**
+      
   pull_request:
-    branches: [ "main", "trunk", "dev", "develop", "development", "release" ]
+    branches:
+      - "main"
+      - "trunk"
+      - "dev(el(op(ment)?)?)?"
+      - "release"
 
 jobs:
   build:
