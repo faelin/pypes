@@ -1,0 +1,29 @@
+name: Verify ready for release
+
+on:
+  pull_request:
+    branches:
+      - '*'
+
+    
+permissions:
+  contents: read
+
+  
+jobs:
+  verify-tests-ran:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Verify tests ran successfully
+        id: verify
+        run: |
+          COMMIT_SHA=$(jq -r '.pull_request.head.sha' "$GITHUB_EVENT_PATH")
+          WORKFLOW_RUNS=$(gh api -X GET "repos/${{ github.repository }}/actions/runs" -F event=push -F status=completed -F head_sha=$COMMIT_SHA -F workflow_name="Test Package")
+          if [ $(echo "$WORKFLOW_RUNS" | jq '.total_count') -eq 0 ]; then
+            echo "No runs of 'Test Package' found for commit $COMMIT_SHA"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
