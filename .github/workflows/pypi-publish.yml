@@ -6,12 +6,8 @@ name: Publish Python distribution to PyPI, TestPyPI, and Github release
 on:
 #  release:
 #    types: [publish]
-  push:
-    branches: [ "main", "release" ]
-    tags:
-      - '*.*.*'
   pull_request:
-    branches: [ "main", "release" ]
+    branches: [ "release" ]
     tags:
       - '*.*.*'
       
