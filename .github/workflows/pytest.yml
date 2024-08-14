@@ -5,9 +5,11 @@ name: 'Test Package'
 
 on:
   push:
-    branches: [ '*' ]
+    branches:
+      - '**'
+      - '!release'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "trunk", "dev", "develop", "development", "release" ]
 
 jobs:
   build:
