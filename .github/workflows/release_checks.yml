@@ -34,7 +34,7 @@ jobs:
         uses: jackbilestech/semver-compare@1.0.4
         with:
           head: ${{ steps.computed-tag.outputs.tag }}
-          base: ${{ steps.computed-tag.outputs.tag }}
+          base: ${{ steps.previous-tag.outputs.tag }}
           operator: '>'
 
   changelog-updated:
